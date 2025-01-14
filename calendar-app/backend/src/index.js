@@ -1,7 +1,6 @@
-// filepath: my-calendar-app/frontend/src/index.js
 const express = require('express');
 const cors = require('cors');
-const { getAuthUrl, getAccessToken, oAuth2Client } = require('./auth');
+const { getAuthUrl, getAccessToken, loadSavedCredentialsIfExist, oAuth2Client } = require('./auth');
 const { google } = require('googleapis');
 const bodyParser = require('body-parser');
 
@@ -23,19 +22,30 @@ app.get('/auth/callback', async (req, res) => {
 });
 
 app.get('/events', async (req, res) => {
+  if (!loadSavedCredentialsIfExist()) {
+    return res.status(401).send('Authentication required');
+  }
   const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
-  const events = await calendar.events.list({
-    calendarId: 'primary',
-    timeMin: new Date().toISOString(),
-    maxResults: 10,
-    singleEvents: true,
-    orderBy: 'startTime',
-  });
-  res.json(events.data.items);
+  try {
+    const events = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: new Date().toISOString(),
+      maxResults: 10,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+    res.json(events.data.items);
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    res.status(500).send('Error fetching events');
+  }
 });
 
 app.post('/events', async (req, res) => {
-  const { title, date, time } = req.body;
+  if (!loadSavedCredentialsIfExist()) {
+    return res.status(401).send('Authentication required');
+  }
+  const { title, date, time, repeat } = req.body;
   const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
   const event = {
     summary: title,
@@ -47,12 +57,18 @@ app.post('/events', async (req, res) => {
       dateTime: new Date(`${date}T${time}:00`).toISOString(),
       timeZone: 'America/Los_Angeles',
     },
+    recurrence: repeat ? [`RRULE:FREQ=WEEKLY;BYDAY=${repeat}`] : [],
   };
-  const response = await calendar.events.insert({
-    calendarId: 'primary',
-    resource: event,
-  });
-  res.json(response.data);
+  try {
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      resource: event,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error creating event:', error);
+    res.status(500).send('Error creating event');
+  }
 });
 
 app.listen(PORT, () => {
