@@ -1,5 +1,12 @@
 {
   "dependencies": {
-    "compromise": "^14.14.3"
+    "compromise": "^14.14.3",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "@babel/plugin-syntax-jsx": "^7.25.9",
+    "@babel/preset-env": "^7.26.0",
+    "@babel/preset-react": "^7.26.3",
+    "jest": "^29.7.0"
   }
 }
